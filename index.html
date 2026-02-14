@@ -1,1 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Offline Equipment Inventory</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">📦</div>
+      <div>
+        <div class="title">Equipment Inventory (Offline)</div>
+        <div class="subtitle">Local-first • Single admin • IndexedDB</div>
+      </div>
+    </div>
+    <div class="right">
+      <span id="syncBadge" class="badge">Offline Ready</span>
+      <button id="btnBackup" class="btn ghost">Backup</button>
+      <button id="btnRestore" class="btn ghost">Restore</button>
+      <button id="btnAbout" class="btn">About</button>
+    </div>
+  </header>
 
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="inventory">Inventory</button>
+    <button class="tab" data-tab="distribution">Distribution</button>
+    <button class="tab" data-tab="payments">Payments</button>
+    <button class="tab" data-tab="reports">Reports</button>
+    <button class="tab" data-tab="settings">Settings</button>
+  </nav>
+
+  <main class="container">
+    <section class="panel active" id="tab-inventory">
+      <div class="panel-head">
+        <div>
+          <h2>Inventory</h2>
+          <p class="muted">Create invoices with one or more items. Search by item/model/supplier to check warranty & serials.</p>
+        </div>
+        <div class="actions">
+          <input id="invSearch" class="input" placeholder="Search item, model, supplier, invoice, PO, serial..." />
+          <button id="btnNewInvoice" class="btn primary">+ New Invoice</button>
+        </div>
+      </div>
+
+      <div class="grid two">
+        <div class="card">
+          <h3>Invoices</h3>
+          <div class="table-wrap">
+            <table class="table" id="tblInvoices">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>PO #</th>
+                  <th>Invoice #</th>
+                  <th>Supplier</th>
+                  <th class="num">Grand Total</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Invoice Items / Serial Status</h3>
+          <div class="muted small">Select an invoice to view its items and serials. “Available” = not allocated & not scrapped.</div>
+          <div class="table-wrap">
+            <table class="table" id="tblInvoiceItems">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Model</th>
+                  <th class="num">Qty</th>
+                  <th>Warranty</th>
+                  <th>Currency</th>
+                  <th class="num">Unit</th>
+                  <th class="num">Tax</th>
+                  <th class="num">Total</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="divider"></div>
+          <h4>Serials</h4>
+          <div class="table-wrap">
+            <table class="table" id="tblSerials">
+              <thead>
+                <tr>
+                  <th>Serial</th>
+                  <th>Item</th>
+                  <th>Model</th>
+                  <th>Status</th>
+                  <th>Warranty</th>
+                  <th>Invoice #</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="tab-distribution">
+      <div class="panel-head">
+        <div>
+          <h2>Distribution (Allocate to User)</h2>
+          <p class="muted">Allocate available serials to users. Optionally record old item returned and add it to Scrapped list.</p>
+        </div>
+      </div>
+
+      <div class="grid two">
+        <div class="card">
+          <h3>New Allocation</h3>
+          <form id="frmAllocate" class="form">
+            <div class="row two">
+              <div>
+                <label>Item</label>
+                <input id="allocItem" class="input" list="dlItems" placeholder="Start typing..." required />
+              </div>
+              <div>
+                <label>Model</label>
+                <input id="allocModel" class="input" list="dlModels" placeholder="Start typing..." required />
+              </div>
+            </div>
+
+            <div class="row two">
+              <div>
+                <label>Serial Number (available)</label>
+                <select id="allocSerial" class="input" required></select>
+              </div>
+              <div>
+                <label>User</label>
+                <input id="allocUser" class="input" list="dlUsers" placeholder="Start typing..." required />
+              </div>
+            </div>
+
+            <div class="row two">
+              <div>
+                <label>Old item received?</label>
+                <select id="oldReceived" class="input">
+                  <option value="no" selected>No</option>
+                  <option value="yes">Yes</option>
+                </select>
+              </div>
+              <div>
+                <label>Comment (optional)</label>
+                <input id="allocComment" class="input" placeholder="Optional note..." />
+              </div>
+            </div>
+
+            <div id="oldBlock" class="card soft hidden">
+              <h4>Old Item Returned (Scrapped)</h4>
+              <div class="row two">
+                <div>
+                  <label>Old Item Name</label>
+                  <input id="oldItem" class="input" placeholder="e.g., Laptop" />
+                </div>
+                <div>
+                  <label>Old Serial</label>
+                  <input id="oldSerial" class="input" placeholder="Serial / Asset tag" />
+                </div>
+              </div>
+              <div class="muted small">This will be saved in the Scrapped Items table with the current date & time.</div>
+            </div>
+
+            <div class="row">
+              <button class="btn primary" type="submit">Add to user</button>
+              <button class="btn" type="button" id="btnClearAlloc">Clear</button>
+            </div>
+          </form>
+
+          <div class="divider"></div>
+
+          <h3>Confirmation Text</h3>
+          <textarea id="confirmText" class="input mono" rows="5" readonly></textarea>
+          <div class="row">
+            <button id="btnCopyConfirm" class="btn">Copy to clipboard</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Allocations</h3>
+          <div class="table-wrap">
+            <table class="table" id="tblAllocations">
+              <thead>
+                <tr>
+                  <th>Date/Time</th>
+                  <th>User</th>
+                  <th>Item</th>
+                  <th>Model</th>
+                  <th>Serial</th>
+                  <th class="num">Unit</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <div class="divider"></div>
+
+          <h3>Scrapped Items</h3>
+          <div class="table-wrap">
+            <table class="table" id="tblScrapped">
+              <thead>
+                <tr>
+                  <th>Date/Time</th>
+                  <th>Item</th>
+                  <th>Serial</th>
+                  <th>Comment</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="tab-payments">
+      <div class="panel-head">
+        <div>
+          <h2>Payments</h2>
+          <p class="muted">Payment rows are created automatically from invoice items. Track approvals and days to due date (default 30 days).</p>
+        </div>
+        <div class="actions">
+          <input id="paySearch" class="input" placeholder="Search PO, invoice, supplier, item, model..." />
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table class="table" id="tblPayments">
+            <thead>
+              <tr>
+                <th>PO #</th>
+                <th>Invoice #</th>
+                <th>Supplier</th>
+                <th>Item</th>
+                <th>Model</th>
+                <th class="num">Qty</th>
+                <th>Cur</th>
+                <th class="num">Unit</th>
+                <th class="num">Total ex-tax</th>
+                <th class="num">Tax</th>
+                <th class="num">Grand</th>
+                <th>Due (days)</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="muted small">Tip: “Due (days)” shows <b>days remaining</b>. Negative means overdue.</div>
+      </div>
+    </section>
+
+    <section class="panel" id="tab-reports">
+      <div class="panel-head">
+        <div>
+          <h2>Reports</h2>
+          <p class="muted">Export reports for auditing (CSV opens in Excel).</p>
+        </div>
+      </div>
+
+      <div class="grid two">
+        <div class="card">
+          <h3>Allocation within date range</h3>
+          <div class="row two">
+            <div>
+              <label>From</label>
+              <input id="repFrom" type="date" class="input" />
+            </div>
+            <div>
+              <label>To</label>
+              <input id="repTo" type="date" class="input" />
+            </div>
+          </div>
+          <div class="row">
+            <button id="btnExportRange" class="btn primary">Export CSV</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Allocation by Item</h3>
+          <label>Item</label>
+          <input id="repItem" class="input" list="dlItems" placeholder="Start typing item name..." />
+          <div class="row">
+            <button id="btnExportByItem" class="btn primary">Export CSV</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Preview</h3>
+        <div class="table-wrap">
+          <table class="table" id="tblReportPreview">
+            <thead><tr id="repHead"></tr></thead>
+            <tbody id="repBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="tab-settings">
+      <div class="panel-head">
+        <div>
+          <h2>Settings</h2>
+          <p class="muted">Single admin. Set default credit days and auto-serial pattern.</p>
+        </div>
+      </div>
+
+      <div class="grid two">
+        <div class="card">
+          <h3>Payment Terms</h3>
+          <label>Default credit days</label>
+          <input id="setCreditDays" type="number" min="0" class="input" />
+          <div class="row">
+            <button id="btnSaveSettings" class="btn primary">Save</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Auto Serial</h3>
+          <label>Pattern</label>
+          <input id="setSerialPattern" class="input mono" />
+          <div class="muted small">
+            Placeholders: <code>{PO}</code> <code>{INV}</code> <code>{ITEM}</code> <code>{MODEL}</code> <code>{YYYY}</code> <code>{SEQ}</code><br/>
+            Example: <code>ZRX-{YYYY}-{INV}-{SEQ}</code>
+          </div>
+        </div>
+      </div>
+
+      <div class="card danger">
+        <h3>Danger Zone</h3>
+        <p class="muted">Deletes all local data on this phone/browser.</p>
+        <button id="btnWipe" class="btn danger">Wipe all data</button>
+      </div>
+    </section>
+  </main>
+
+  <datalist id="dlSuppliers"></datalist>
+  <datalist id="dlItems"></datalist>
+  <datalist id="dlModels"></datalist>
+  <datalist id="dlUsers"></datalist>
+
+  <dialog id="dlgInvoice" class="dialog">
+    <form method="dialog" id="frmInvoice" class="dialog-body">
+      <div class="dialog-head">
+        <h3 id="dlgTitle">New Invoice</h3>
+        <button class="btn ghost" value="cancel" type="submit">✕</button>
+      </div>
+
+      <div class="row two">
+        <div>
+          <label>Date</label>
+          <input id="invDate" type="date" class="input" required />
+        </div>
+        <div>
+          <label>Currency</label>
+          <select id="invCurrency" class="input">
+            <option value="LKR">LKR</option>
+            <option value="USD">$ (USD)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row two">
+        <div>
+          <label>PO Number</label>
+          <input id="poNumber" class="input" required />
+        </div>
+        <div>
+          <label>Invoice Number</label>
+          <input id="invoiceNumber" class="input" required />
+        </div>
+      </div>
+
+      <label>Supplier Name</label>
+      <input id="supplierName" class="input" list="dlSuppliers" required />
+
+      <div class="divider"></div>
+
+      <div class="row space">
+        <h4>Invoice Items</h4>
+        <button type="button" id="btnAddLine" class="btn">+ Add item line</button>
+      </div>
+
+      <div id="lines"></div>
+
+      <div class="divider"></div>
+
+      <div class="row two">
+        <div class="card soft">
+          <div class="kv">
+            <div class="muted">Grand total</div>
+            <div id="grandTotal" class="big">0</div>
+          </div>
+        </div>
+        <div class="row end">
+          <button class="btn" value="cancel" type="submit">Cancel</button>
+          <button class="btn primary" value="ok" type="submit" id="btnSaveInvoice">Save Invoice</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="dlgBackup" class="dialog">
+    <form method="dialog" class="dialog-body">
+      <div class="dialog-head">
+        <h3>Backup & Restore</h3>
+        <button class="btn ghost" value="cancel" type="submit">✕</button>
+      </div>
+      <p class="muted">Backup saves all data into a single JSON file. Restore merges into this phone.</p>
+      <div class="row">
+        <button id="btnDoBackup" type="button" class="btn primary">Download backup file</button>
+      </div>
+      <div class="divider"></div>
+      <label>Restore from backup (.json)</label>
+      <input id="restoreFile" type="file" accept="application/json" class="input" />
+      <div class="row">
+        <button id="btnDoRestore" type="button" class="btn">Restore</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="dlgAbout" class="dialog">
+    <form method="dialog" class="dialog-body">
+      <div class="dialog-head">
+        <h3>About</h3>
+        <button class="btn ghost" value="cancel" type="submit">✕</button>
+      </div>
+      <p class="muted">
+        Offline-first inventory web app storing data in your browser (IndexedDB). Works offline after first load.
+      </p>
+      <p class="muted small">Version: <span id="appVersion"></span></p>
+    </form>
+  </dialog>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
