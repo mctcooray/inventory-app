@@ -1,4 +1,4 @@
-const CACHE = "equip-inventory-offline-v1";
+const CACHE = "equip-inventory-offline-v2";
 const ASSETS = ["./","./index.html","./styles.css","./app.js","./manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
