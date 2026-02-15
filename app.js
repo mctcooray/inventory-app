@@ -1,3 +1,6 @@
+window.addEventListener("error", (e) => alert("JS error: " + e.message));
+window.addEventListener("unhandledrejection", (e) => alert("Promise error: " + e.reason));
+alert("app.js loaded ✅");
 // Offline Equipment Inventory — single-file app.js (module)
 const VERSION = "0.1.0-mvp";
 
